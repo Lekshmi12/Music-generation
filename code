@@ -1,0 +1,72 @@
+import tensorflow as tf 
+
+!pip install PyDrive
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
+from google.colab import auth
+from oauth2client.client import GoogleCredentials
+
+import os
+import numpy as np
+import pandas as pd
+
+auth.authenticate_user()
+gauth = GoogleAuth()
+gauth.credentials = GoogleCredentials.get_application_default()
+drive = GoogleDrive(gauth)
+from music21 import *
+songs = pd.read_csv("/content/drive/My Drive/new data/dataset.csv")
+notes = [element for note in songs for element in note]
+unique_notes = list(set(notes))
+
+vect_input = dict((note_, number) for note_, number in enumerate(unique_notes))
+map_input = np.array(unique_notes)
+
+def vectorizing(string):
+vect_song = []
+for c in string : 
+  temp_song=[]
+  for character in c:
+    temp_song.append([vect_input[character]])
+vect_song = np.array(vect_song.append(temp_song))
+return vect_song
+
+input_vector = vectorizing(allsongs)
+
+from sklearn.model_selection import train_test_split
+train, test = train_test_split(input_vector,test_size=0.2,random_state=0)
+
+def lstm_model(units) :
+    model = tf.keras.layers.LSTM(units, return_sequences=True, recurrent_activation='sigmoid', recurrent_initializer='glorot_normal', stateful=True)  
+    model.compile(loss='sparse_categorical_crossentropy', optimizer = 'rmsprop')
+    return model
+    
+def full_model(length_of_song, dim, units, batch_size):
+    model_full = tf.keras.Sequential([tf.keras.layers.Embedding(length_of_song=len(unique_notes),dim=256, batch_input_shape = 32,None)]),lstm_model(units=1024),tf.keras.layers.Dense(len(unique_notes))])
+  return model_full
+prediction_first = full_model(train)
+index_sample = tf.random.categorical(prediction_first[0], num_samples = 1)
+
+model1 = full_model(length_of_song = len(unique_notes), dim =256 , units = 1024), batch_size=1)
+model1.summary()
+
+def song_text_gen(start_from = [x[0] for x in test], model1, char_length = 750):
+  for s in start_from:
+    input_string = map_input[s]
+  model1.reset_states()
+  for i in range(char__length):
+    pred = model1(input_string)
+    pred = tf.squeeze(pred,0)
+    out_val = tf.random.categorical(pred, num_samples=1)[-1,0].numpy()
+    input_string = out_val
+    output_string = output_string.append(map_input(out_val))
+    gen_song = start_from + ' ' + output_string
+    return gen_song
+
+song_text = song_text_gen(char_length=1000)
+
+out_file = stream.Stream(song_text)
+out_file.write('midi', fp='out.mid')
+
+
+
